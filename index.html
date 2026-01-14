@@ -3,88 +3,128 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Canlı Ortak Depo</title>
+    <title>Beroli Stok | Canlı Takip</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: sans-serif; background: #f0f2f5; padding: 20px; text-align: center; }
-        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 400px; margin: 10px auto; }
-        input { width: 80%; padding: 10px; margin: 5px; border: 1px solid #ddd; border-radius: 5px; }
-        button { padding: 10px 20px; background: #2ecc71; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
-        .delete-btn { background: #e74c3c; padding: 5px 10px; margin-left: 10px; }
-        table { width: 100%; margin-top: 20px; border-collapse: collapse; }
-        th, td { padding: 10px; border-bottom: 1px solid #eee; }
-        #status { font-size: 12px; color: #666; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .container { max-width: 500px; width: 100%; }
+        h2 { color: #1a73e8; text-align: center; }
+        .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        input { width: calc(100% - 24px); padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
+        button { width: 100%; padding: 12px; background: #1a73e8; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        button:active { transform: scale(0.98); }
+        .status { font-size: 12px; text-align: center; color: #666; margin-bottom: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th { background: #f8f9fa; padding: 10px; text-align: left; font-size: 14px; }
+        td { padding: 10px; border-bottom: 1px solid #eee; font-size: 15px; }
+        .delete-btn { background: #ff4757; width: auto; padding: 5px 10px; font-size: 12px; }
+        #chartContainer { height: 250px; }
     </style>
 </head>
 <body>
 
-    <h2>🌐 Canlı Ortak Depo</h2>
-    <p id="status">Bağlanıyor...</p>
+<div class="container">
+    <h2>📊 Beroli Canlı Stok</h2>
+    <div id="status" class="status">Bağlantı kuruluyor...</div>
 
     <div class="card">
-        <input type="text" id="pName" placeholder="Ürün Adı">
+        <canvas id="myChart"></canvas>
+    </div>
+
+    <div class="card">
+        <input type="text" id="pName" placeholder="Ürün Adı (Örn: Elma)">
         <input type="number" id="pQty" placeholder="Adet">
-        <button onclick="addItem()">Ekle</button>
+        <button onclick="addItem()">LİSTEYE EKLE</button>
     </div>
 
     <div class="card">
         <table>
             <thead>
-                <tr><th>Ürün</th><th>Adet</th><th>İşlem</th></tr>
+                <tr><th>Ürün</th><th>Stok</th><th>İşlem</th></tr>
             </thead>
             <tbody id="list"></tbody>
         </table>
     </div>
+</div>
 
-    <script>
-        // Herkesin ortak kullanacağı gizli hafıza adresi
-        const url = "https://api.jsonbin.io/v3/b/6786c2e8ad19ca34f8ec8a01";
-        const key = "$2a$10$9v1P/C.Y6y5Xh8C0YxXWneUeYV7uV9p8L2Xq9zR7Z6R7Z6R7Z6";
+<script>
+    // Ortak İnternet Hafızası (JSONBin)
+    const url = "https://api.jsonbin.io/v3/b/6786c2e8ad19ca34f8ec8a01";
+    const key = "$2a$10$9v1P/C.Y6y5Xh8C0YxXWneUeYV7uV9p8L2Xq9zR7Z6R7Z6R7Z6";
+    let myChart;
 
-        async function getData() {
-            try {
-                const res = await fetch(url + "/latest", { headers: { "X-Master-Key": key }});
-                const data = await res.json();
-                render(data.record.products || []);
-                document.getElementById('status').innerText = "✅ Canlı Bağlantı Aktif";
-            } catch (e) { document.getElementById('status').innerText = "❌ Bağlantı Hatası"; }
-        }
+    // Verileri İnternetten Çek
+    async function getData() {
+        try {
+            const res = await fetch(url + "/latest", { headers: { "X-Master-Key": key }});
+            const data = await res.json();
+            const products = data.record.products || [];
+            render(products);
+            updateChart(products);
+            document.getElementById('status').innerText = "✅ Canlı Veri Aktif";
+        } catch (e) { document.getElementById('status').innerText = "❌ Bağlantı Yok"; }
+    }
 
-        async function updateData(newList) {
-            document.getElementById('status').innerText = "⏳ Güncelleniyor...";
-            await fetch(url, {
-                method: 'PUT',
-                headers: { "Content-Type": "application/json", "X-Master-Key": key },
-                body: JSON.stringify({ products: newList })
-            });
-            getData();
-        }
-
-        function render(items) {
-            const list = document.getElementById('list');
-            list.innerHTML = "";
-            items.forEach((item, i) => {
-                list.innerHTML += `<tr><td>${item.name}</td><td>${item.qty}</td><td><button class="delete-btn" onclick="deleteItem(${i})">Sil</button></td></tr>`;
-            });
-            window.currentItems = items;
-        }
-
-        async function addItem() {
-            const name = document.getElementById('pName').value;
-            const qty = document.getElementById('pQty').value;
-            if(!name || !qty) return alert("Doldur!");
-            const newList = [...(window.currentItems || []), { name, qty }];
-            await updateData(newList);
-            document.getElementById('pName').value = "";
-            document.getElementById('pQty').value = "";
-        }
-
-        async function deleteItem(index) {
-            const newList = window.currentItems.filter((_, i) => i !== index);
-            await updateData(newList);
-        }
-
+    // Verileri İnternete Kaydet
+    async function updateData(newList) {
+        document.getElementById('status').innerText = "⏳ Kaydediliyor...";
+        await fetch(url, {
+            method: 'PUT',
+            headers: { "Content-Type": "application/json", "X-Master-Key": key },
+            body: JSON.stringify({ products: newList })
+        });
         getData();
-        setInterval(getData, 5000); // 5 saniyede bir otomatik yenile (başkası bir şey ekledi mi diye)
-    </script>
+    }
+
+    function render(items) {
+        const list = document.getElementById('list');
+        list.innerHTML = "";
+        items.forEach((item, i) => {
+            list.innerHTML += `<tr><td>${item.name}</td><td><b>${item.qty}</b></td><td><button class="delete-btn" onclick="deleteItem(${i})">Sil</button></td></tr>`;
+        });
+        window.currentItems = items;
+    }
+
+    function updateChart(items) {
+        const labels = items.map(i => i.name);
+        const counts = items.map(i => i.qty);
+        
+        if (myChart) { myChart.destroy(); }
+        const ctx = document.getElementById('myChart').getContext('2d');
+        myChart = new Chart(ctx, {
+            type: 'doughnut', // 'bar' yaparsan sütun grafiği olur
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Stok Miktarı',
+                    data: counts,
+                    backgroundColor: ['#1a73e8', '#34a853', '#fbbc05', '#ea4335', '#8e44ad', '#2c3e50'],
+                }]
+            },
+            options: { maintainAspectRatio: false }
+        });
+    }
+
+    async function addItem() {
+        const name = document.getElementById('pName').value;
+        const qty = document.getElementById('pQty').value;
+        if(!name || !qty) return alert("Lütfen boş bırakma!");
+        const newList = [...(window.currentItems || []), { name, qty: Number(qty) }];
+        await updateData(newList);
+        document.getElementById('pName').value = "";
+        document.getElementById('pQty').value = "";
+    }
+
+    async function deleteItem(index) {
+        const newList = window.currentItems.filter((_, i) => i !== index);
+        await updateData(newList);
+    }
+
+    // İlk açılışta veriyi çek
+    getData();
+    // 10 saniyede bir otomatik tazele (başkası bir şey ekledi mi diye)
+    setInterval(getData, 10000);
+</script>
+
 </body>
 </html>
