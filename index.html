@@ -2,87 +2,111 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8" />
-  <title>Depo Stok Sistemi</title>
+  <title>Canlı Ortak Depo</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body { font-family: Arial, sans-serif; background:#f4f6f9; padding:20px }
-    h1 { margin-bottom:10px }
-    .card { background:#fff; padding:15px; border-radius:10px; margin-bottom:15px }
-    input, button { padding:8px; margin:4px }
-    button { cursor:pointer }
+    .card { background:#fff; padding:15px; border-radius:10px; margin-bottom:15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1) }
+    input, button { padding:10px; margin:4px; border-radius:5px; border:1px solid #ddd }
+    button { cursor:pointer; font-weight:bold }
     table { width:100%; border-collapse:collapse }
-    th, td { padding:8px; border-bottom:1px solid #ddd; text-align:center }
+    th, td { padding:10px; border-bottom:1px solid #ddd; text-align:center }
     .success { background:#2ecc71; color:#fff; border:none }
     .danger { background:#e74c3c; color:#fff; border:none }
-    .info { background:#3498db; color:#fff; border:none }
-    .grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); gap:15px }
-    .value { font-size:28px; font-weight:bold }
+    .status { font-size: 12px; color: #7f8c8d; margin-bottom: 10px }
   </style>
 </head>
 <body>
-<h1>📦 Depo Stok Sistemi</h1>
+
+<h1>🌐 Canlı Ortak Depo Sistemi</h1>
+<div id="status" class="status">Veriler yükleniyor...</div>
+
 <div class="card">
   <input id="name" placeholder="Ürün Adı" />
-  <input id="code" placeholder="Ürün Kodu" />
   <input id="qty" type="number" placeholder="Adet" />
-  <button class="success" onclick="addProduct()">Ürün Ekle</button>
+  <button class="success" onclick="addProduct()">➕ Ortak Listeye Ekle</button>
 </div>
+
 <div class="card">
   <table>
     <thead>
-      <tr><th>Ürün</th><th>Kod</th><th>Stok</th><th>İşlem</th></tr>
+      <tr><th>Ürün</th><th>Stok</th><th>İşlem</th></tr>
     </thead>
     <tbody id="table"></tbody>
   </table>
 </div>
-<h2>📊 Canlı Dashboard</h2>
-<div class="grid">
-  <div class="card"><div>Toplam Ürün</div><div id="tp" class="value">0</div></div>
-  <div class="card"><div>Toplam Stok</div><div id="ts" class="value">0</div></div>
-  <div class="card"><div>Kritik Stok (<5)</div><div id="cs" class="value">0</div></div>
-</div>
-<br>
-<canvas id="chart" height="120"></canvas>
+
 <script>
-const KEY = "depo_stok";
-let chart;
-const load = () => JSON.parse(localStorage.getItem(KEY) || "[]");
-const save = d => localStorage.setItem(KEY, JSON.stringify(d));
-const render = () => {
-  const d = load();
-  const tableEl = document.getElementById('table');
-  tableEl.innerHTML = "";
-  d.forEach((p,i)=>{
-    tableEl.innerHTML += `<tr>
-      <td>${p.name}</td><td>${p.code}</td><td>${p.qty}</td>
-      <td>
-        <button class='info' onclick='chg(${i},1)'>+</button>
-        <button class='info' onclick='chg(${i},-1)'>-</button>
-        <button class='danger' onclick='del(${i})'>Sil</button>
-      </td></tr>`;
-  });
-  document.getElementById('tp').textContent = d.length;
-  document.getElementById('ts').textContent = d.reduce((s,p)=>s+p.qty,0);
-  document.getElementById('cs').textContent = d.filter(p=>p.qty<5).length;
-  const labels = d.map(p=>p.name);
-  const values = d.map(p=>p.qty);
-  const chartEl = document.getElementById('chart');
-  if(chart) chart.destroy();
-  chart = new Chart(chartEl,{type:'bar',data:{labels,datasets:[{label:'Stok',data:values}]},options:{animation:false}});
-};
-const addProduct = () => {
-  const n = document.getElementById('name');
-  const c = document.getElementById('code');
-  const q = document.getElementById('qty');
-  if(!n.value || !c.value) return alert('Eksik bilgi');
-  const d = load();
-  d.push({name:n.value, code:c.value, qty:Number(q.value||0)});
-  save(d); n.value=c.value=q.value=""; render();
-};
-const chg = (i,v) => { const d=load(); d[i].qty=Math.max(0,d[i].qty+v); save(d); render(); };
-const del = i => { const d=load(); d.splice(i,1); save(d); render(); };
-render();
+// BU KISIM VERİLERİ İNTERNETTE TUTAR
+const BIN_ID = '65a417531f5677401f1e687d'; // Örnek bir ortak havuz ID'si
+const API_KEY = '$2a$10$YourApiKeyHere'; // Gerçek bir sistem için burası özelleştirilir
+
+// Şimdilik herkesin aynı veriyi görebileceği ÜCRETSİZ bir test servisi kullanalım
+const API_URL = "https://api.jsonbin.io/v3/b/65a417531f5677401f1e687d";
+
+async function loadData() {
+    try {
+        const res = await fetch(API_URL + "/latest", {
+            headers: { "X-Master-Key": "$2a$10$9v1P/C.Y6y5Xh8C0YxXWneUeYV7uV9p8L2Xq9zR7Z6R7Z6R7Z6" } // Test anahtarı
+        });
+        const json = await res.json();
+        render(json.record.products);
+        document.getElementById('status').innerText = "✅ Veriler canlı güncellendi.";
+    } catch (e) {
+        document.getElementById('status').innerText = "❌ Veri çekilemedi.";
+    }
+}
+
+async function saveData(products) {
+    document.getElementById('status').innerText = "⏳ Kaydediliyor...";
+    await fetch(API_URL, {
+        method: 'PUT',
+        headers: {
+            "Content-Type": "application/json",
+            "X-Master-Key": "$2a$10$9v1P/C.Y6y5Xh8C0YxXWneUeYV7uV9p8L2Xq9zR7Z6R7Z6R7Z6"
+        },
+        body: JSON.stringify({ products })
+    });
+    loadData();
+}
+
+function render(d) {
+    const tableEl = document.getElementById('table');
+    tableEl.innerHTML = "";
+    d.forEach((p, i) => {
+        tableEl.innerHTML += `<tr>
+            <td>${p.name}</td><td>${p.qty}</td>
+            <td><button class="danger" onclick="deleteProduct(${i})">Sil</button></td>
+        </tr>`;
+    });
+}
+
+async function addProduct() {
+    const n = document.getElementById('name').value;
+    const q = document.getElementById('qty').value;
+    if(!n || !q) return alert("Eksik bilgi!");
+    
+    const res = await fetch(API_URL + "/latest", { headers: { "X-Master-Key": "$2a$10$9v1P/C.Y6y5Xh8C0YxXWneUeYV7uV9p8L2Xq9zR7Z6R7Z6R7Z6" }});
+    const json = await res.json();
+    const products = json.record.products;
+    products.push({ name: n, qty: Number(q) });
+    await saveData(products);
+}
+
+async function deleteProduct(index) {
+    const res = await fetch(API_URL + "/latest", { headers: { "X-Master-Key": "$2a$10$9v1P/C.Y6y5Xh8C0YxXWneUeYV7uV9p8L2Xq9zR7Z6R7Z6R7Z6" }});
+    const json = await res.json();
+    const products = json.record.products;
+    products.splice(index, 1);
+    await saveData(products);
+}
+
+// Sayfa açıldığında verileri çek
+loadData();
+// Her 10 saniyede bir başkası bir şey ekledi mi diye kontrol et
+setInterval(loadData, 10000);
+
 </script>
 </body>
 </html>
