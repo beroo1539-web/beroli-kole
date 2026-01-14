@@ -3,44 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Beroli Stok | Canlı Takip</title>
+    <title>Beroli Canlı Stok Sistemi</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        .container { max-width: 500px; width: 100%; }
-        h2 { color: #1a73e8; text-align: center; }
-        .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        input { width: calc(100% - 24px); padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
-        button { width: 100%; padding: 12px; background: #1a73e8; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; }
-        button:active { transform: scale(0.98); }
-        .status { font-size: 12px; text-align: center; color: #666; margin-bottom: 10px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th { background: #f8f9fa; padding: 10px; text-align: left; font-size: 14px; }
-        td { padding: 10px; border-bottom: 1px solid #eee; font-size: 15px; }
-        .delete-btn { background: #ff4757; width: auto; padding: 5px 10px; font-size: 12px; }
-        #chartContainer { height: 250px; }
+        :root { --primary: #1a73e8; --success: #34a853; --danger: #ea4335; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8f9fa; margin: 0; padding: 15px; color: #333; }
+        .container { max-width: 450px; margin: 0 auto; }
+        h2 { text-align: center; color: var(--primary); font-size: 24px; margin-bottom: 5px; }
+        .status-bar { text-align: center; font-size: 13px; margin-bottom: 15px; padding: 5px; border-radius: 20px; }
+        .online { background: #e6f4ea; color: var(--success); }
+        .offline { background: #fce8e6; color: var(--danger); }
+        .card { background: white; border-radius: 16px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 20px; }
+        input { width: 100%; box-sizing: border-box; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; outline: none; }
+        input:focus { border-color: var(--primary); }
+        button { width: 100%; padding: 14px; background: var(--primary); color: white; border: none; border-radius: 10px; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.2s; }
+        button:active { transform: scale(0.97); }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { text-align: left; color: #666; font-size: 14px; padding-bottom: 10px; border-bottom: 2px solid #f1f3f4; }
+        td { padding: 12px 0; border-bottom: 1px solid #f1f3f4; font-size: 15px; }
+        .qty-badge { background: #f1f3f4; padding: 4px 10px; border-radius: 8px; font-weight: bold; }
+        .del-btn { color: var(--danger); background: none; border: none; font-size: 14px; width: auto; padding: 5px; }
+        #chartContainer { min-height: 200px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>📊 Beroli Canlı Stok</h2>
-    <div id="status" class="status">Bağlantı kuruluyor...</div>
+    <h2>📊 Beroli Stok Pro</h2>
+    <div id="status" class="status-bar online">🔄 Bağlantı kuruluyor...</div>
 
     <div class="card">
-        <canvas id="myChart"></canvas>
+        <canvas id="myChart" style="max-height: 250px;"></canvas>
     </div>
 
     <div class="card">
-        <input type="text" id="pName" placeholder="Ürün Adı (Örn: Elma)">
-        <input type="number" id="pQty" placeholder="Adet">
+        <input type="text" id="pName" placeholder="Ürün Adı (Örn: Elma)" autocomplete="off">
+        <input type="number" id="pQty" placeholder="Adet" autocomplete="off">
         <button onclick="addItem()">LİSTEYE EKLE</button>
     </div>
 
     <div class="card">
         <table>
             <thead>
-                <tr><th>Ürün</th><th>Stok</th><th>İşlem</th></tr>
+                <tr>
+                    <th>Ürün</th>
+                    <th>Stok</th>
+                    <th>İşlem</th>
+                </tr>
             </thead>
             <tbody id="list"></tbody>
         </table>
@@ -48,82 +57,103 @@
 </div>
 
 <script>
-    // Ortak İnternet Hafızası (JSONBin)
-    const url = "https://api.jsonbin.io/v3/b/6786c2e8ad19ca34f8ec8a01";
-    const key = "$2a$10$9v1P/C.Y6y5Xh8C0YxXWneUeYV7uV9p8L2Xq9zR7Z6R7Z6R7Z6";
-    let myChart;
+    // Ortak Havuz Bağlantısı
+    const BIN_ID = "6786c2e8ad19ca34f8ec8a01";
+    const API_KEY = "$2a$10$9v1P/C.Y6y5Xh8C0YxXWneUeYV7uV9p8L2Xq9zR7Z6R7Z6R7Z6";
+    const API_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 
-    // Verileri İnternetten Çek
-    async function getData() {
+    let myChart = null;
+    let currentProducts = [];
+
+    // Verileri İnternetten Getir
+    async function loadData() {
         try {
-            const res = await fetch(url + "/latest", { headers: { "X-Master-Key": key }});
+            const res = await fetch(`${API_URL}/latest`, {
+                headers: { "X-Master-Key": API_KEY }
+            });
             const data = await res.json();
-            const products = data.record.products || [];
-            render(products);
-            updateChart(products);
-            document.getElementById('status').innerText = "✅ Canlı Veri Aktif";
-        } catch (e) { document.getElementById('status').innerText = "❌ Bağlantı Yok"; }
+            currentProducts = data.record.products || [];
+            updateUI();
+            document.getElementById('status').innerText = "✅ Canlı Bağlantı Aktif";
+            document.getElementById('status').className = "status-bar online";
+        } catch (err) {
+            document.getElementById('status').innerText = "❌ Bağlantı Hatası";
+            document.getElementById('status').className = "status-bar offline";
+        }
     }
 
     // Verileri İnternete Kaydet
-    async function updateData(newList) {
+    async function saveData(newList) {
         document.getElementById('status').innerText = "⏳ Kaydediliyor...";
-        await fetch(url, {
-            method: 'PUT',
-            headers: { "Content-Type": "application/json", "X-Master-Key": key },
-            body: JSON.stringify({ products: newList })
-        });
-        getData();
+        try {
+            await fetch(API_URL, {
+                method: 'PUT',
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-Master-Key": API_KEY
+                },
+                body: JSON.stringify({ products: newList })
+            });
+            await loadData();
+        } catch (err) {
+            alert("Kayıt sırasında hata oluştu!");
+        }
     }
 
-    function render(items) {
-        const list = document.getElementById('list');
-        list.innerHTML = "";
-        items.forEach((item, i) => {
-            list.innerHTML += `<tr><td>${item.name}</td><td><b>${item.qty}</b></td><td><button class="delete-btn" onclick="deleteItem(${i})">Sil</button></td></tr>`;
-        });
-        window.currentItems = items;
-    }
+    function updateUI() {
+        // Tabloyu Güncelle
+        const listBody = document.getElementById('list');
+        listBody.innerHTML = currentProducts.map((p, i) => `
+            <tr>
+                <td>${p.name}</td>
+                <td><span class="qty-badge">${p.qty}</span></td>
+                <td><button class="del-btn" onclick="deleteItem(${i})">Sil</button></td>
+            </tr>
+        `).join('');
 
-    function updateChart(items) {
-        const labels = items.map(i => i.name);
-        const counts = items.map(i => i.qty);
-        
-        if (myChart) { myChart.destroy(); }
+        // Grafiği Güncelle
         const ctx = document.getElementById('myChart').getContext('2d');
-        myChart = new Chart(ctx, {
-            type: 'doughnut', // 'bar' yaparsan sütun grafiği olur
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Stok Miktarı',
-                    data: counts,
-                    backgroundColor: ['#1a73e8', '#34a853', '#fbbc05', '#ea4335', '#8e44ad', '#2c3e50'],
-                }]
-            },
-            options: { maintainAspectRatio: false }
-        });
+        if (myChart) myChart.destroy();
+        
+        if (currentProducts.length > 0) {
+            myChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: currentProducts.map(p => p.name),
+                    datasets: [{
+                        data: currentProducts.map(p => p.qty),
+                        backgroundColor: ['#4285f4', '#34a853', '#fbbc05', '#ea4335', '#a142f4', '#24c1e0']
+                    }]
+                },
+                options: { plugins: { legend: { position: 'bottom' } } }
+            });
+        }
     }
 
     async function addItem() {
-        const name = document.getElementById('pName').value;
-        const qty = document.getElementById('pQty').value;
-        if(!name || !qty) return alert("Lütfen boş bırakma!");
-        const newList = [...(window.currentItems || []), { name, qty: Number(qty) }];
-        await updateData(newList);
+        const name = document.getElementById('pName').value.trim();
+        const qty = parseInt(document.getElementById('pQty').value);
+        
+        if (!name || isNaN(qty)) {
+            alert("Lütfen ürün adı ve adet girin!");
+            return;
+        }
+
+        const newList = [...currentProducts, { name, qty }];
+        await saveData(newList);
         document.getElementById('pName').value = "";
         document.getElementById('pQty').value = "";
     }
 
     async function deleteItem(index) {
-        const newList = window.currentItems.filter((_, i) => i !== index);
-        await updateData(newList);
+        const newList = currentProducts.filter((_, i) => i !== index);
+        await saveData(newList);
     }
 
-    // İlk açılışta veriyi çek
-    getData();
-    // 10 saniyede bir otomatik tazele (başkası bir şey ekledi mi diye)
-    setInterval(getData, 10000);
+    // Başlat
+    loadData();
+    // 10 saniyede bir otomatik yenile (başkası bir şey ekledi mi diye)
+    setInterval(loadData, 10000);
 </script>
 
 </body>
