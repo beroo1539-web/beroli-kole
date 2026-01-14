@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Depo Stok Sistemi</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f4f6f9; padding:20px }
+    h1 { margin-bottom:10px }
+    .card { background:#fff; padding:15px; border-radius:10px; margin-bottom:15px }
+    input, button { padding:8px; margin:4px }
+    button { cursor:pointer }
+    table { width:100%; border-collapse:collapse }
+    th, td { padding:8px; border-bottom:1px solid #ddd; text-align:center }
+    .success { background:#2ecc71; color:#fff; border:none }
+    .danger { background:#e74c3c; color:#fff; border:none }
+    .info { background:#3498db; color:#fff; border:none }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); gap:15px }
+    .value { font-size:28px; font-weight:bold }
+  </style>
+</head>
+<body>
+<h1>📦 Depo Stok Sistemi</h1>
+<div class="card">
+  <input id="name" placeholder="Ürün Adı" />
+  <input id="code" placeholder="Ürün Kodu" />
+  <input id="qty" type="number" placeholder="Adet" />
+  <button class="success" onclick="addProduct()">Ürün Ekle</button>
+</div>
+<div class="card">
+  <table>
+    <thead>
+      <tr><th>Ürün</th><th>Kod</th><th>Stok</th><th>İşlem</th></tr>
+    </thead>
+    <tbody id="table"></tbody>
+  </table>
+</div>
+<h2>📊 Canlı Dashboard</h2>
+<div class="grid">
+  <div class="card"><div>Toplam Ürün</div><div id="tp" class="value">0</div></div>
+  <div class="card"><div>Toplam Stok</div><div id="ts" class="value">0</div></div>
+  <div class="card"><div>Kritik Stok (<5)</div><div id="cs" class="value">0</div></div>
+</div>
+<br>
+<canvas id="chart" height="120"></canvas>
+<script>
+const KEY = "depo_stok";
+let chart;
+const load = () => JSON.parse(localStorage.getItem(KEY) || "[]");
+const save = d => localStorage.setItem(KEY, JSON.stringify(d));
+const render = () => {
+  const d = load();
+  const tableEl = document.getElementById('table');
+  tableEl.innerHTML = "";
+  d.forEach((p,i)=>{
+    tableEl.innerHTML += `<tr>
+      <td>${p.name}</td><td>${p.code}</td><td>${p.qty}</td>
+      <td>
+        <button class='info' onclick='chg(${i},1)'>+</button>
+        <button class='info' onclick='chg(${i},-1)'>-</button>
+        <button class='danger' onclick='del(${i})'>Sil</button>
+      </td></tr>`;
+  });
+  document.getElementById('tp').textContent = d.length;
+  document.getElementById('ts').textContent = d.reduce((s,p)=>s+p.qty,0);
+  document.getElementById('cs').textContent = d.filter(p=>p.qty<5).length;
+  const labels = d.map(p=>p.name);
+  const values = d.map(p=>p.qty);
+  const chartEl = document.getElementById('chart');
+  if(chart) chart.destroy();
+  chart = new Chart(chartEl,{type:'bar',data:{labels,datasets:[{label:'Stok',data:values}]},options:{animation:false}});
+};
+const addProduct = () => {
+  const n = document.getElementById('name');
+  const c = document.getElementById('code');
+  const q = document.getElementById('qty');
+  if(!n.value || !c.value) return alert('Eksik bilgi');
+  const d = load();
+  d.push({name:n.value, code:c.value, qty:Number(q.value||0)});
+  save(d); n.value=c.value=q.value=""; render();
+};
+const chg = (i,v) => { const d=load(); d[i].qty=Math.max(0,d[i].qty+v); save(d); render(); };
+const del = i => { const d=load(); d.splice(i,1); save(d); render(); };
+render();
+</script>
+</body>
+</html>
